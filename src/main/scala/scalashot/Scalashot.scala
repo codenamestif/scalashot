@@ -12,9 +12,12 @@ import java.io.ByteArrayOutputStream
 import org.imgscalr.Scalr
 import com.cloudinary.Cloudinary
 import java.util.Collections
-import actors.Actor
+import akka.actor.{Actor, Props, ActorSystem}
 
-object Scalashot extends App with Actor {
+object Scalashot extends App {
+
+  private val system = ActorSystem("System")
+  private val eventHandler = system.actorOf(Props(EventHandler))
 
   private val screen = new Robot().createScreenCapture(new Rectangle(Toolkit.getDefaultToolkit.getScreenSize))
 
@@ -28,12 +31,12 @@ object Scalashot extends App with Actor {
 
     reactions += {
       case e: MouseEntered => requestFocus()
-      case e: MousePressed => Scalashot ! PressPoint(e.point.x, e.point.y)
-      case e: MouseDragged => Scalashot ! DragPoint(e.point.x, e.point.y)
-      case e: MouseReleased => Scalashot ! ReleasePoint(e.point.x, e.point.y)
+      case e: MousePressed => eventHandler ! PressPoint(e.point.x, e.point.y)
+      case e: MouseDragged => eventHandler ! DragPoint(e.point.x, e.point.y)
+      case e: MouseReleased => eventHandler ! ReleasePoint(e.point.x, e.point.y)
       case e: KeyReleased if e.modifiers == Key.Modifier.Control => e.key match {
-        case Key.W => Scalashot ! UploadAction
-        case Key.S => Scalashot ! SaveAction
+        case Key.W => eventHandler ! UploadAction
+        case Key.S => eventHandler ! SaveAction
         case _ =>
       }
       case e: KeyReleased if e.key == Key.Escape => sys.exit()
@@ -41,6 +44,38 @@ object Scalashot extends App with Actor {
 
     override protected def paintComponent(g: Graphics2D) {
       g.drawImage(screen, 0, 0, screen.getWidth, screen.getHeight, null)
+    }
+
+  }
+
+  private object EventHandler extends Actor {
+
+    import context._
+
+    def receive = {
+      case PressPoint(pressX, pressY) => become({
+        case DragPoint(dragX, dragY) => {
+          canvas.self.getGraphics.drawImage(screen, 0, 0, screen.getWidth, screen.getHeight, null)
+          canvas.self.getGraphics.drawRect(
+            pressX min dragX,
+            pressY min dragY,
+            math.abs(dragX - pressX),
+            math.abs(dragY - pressY)
+          )
+        }
+        case ReleasePoint(releaseX, releaseY) => become({
+          case UploadAction => uploadImage(Scalr.crop(screen, pressX min releaseX,
+            pressY min releaseY,
+            math.abs(releaseX - pressX),
+            math.abs(releaseY - pressY), null))
+          case SaveAction => saveImage(Scalr.crop(screen, pressX min releaseX,
+            pressY min releaseY,
+            math.abs(releaseX - pressX),
+            math.abs(releaseY - pressY), null))
+          case event => receive(event)
+        })
+        case event => receive(event)
+      })
     }
 
   }
@@ -63,40 +98,6 @@ object Scalashot extends App with Actor {
   }
 
   private val cloudinary = new Cloudinary(args(0))
-
-  start()
-
-  def act() {
-    react(action)
-  }
-
-
-  private def action: PartialFunction[Any, Unit] = {
-    case pressPoint: PressPoint => loop(react {
-      case dragPoint: DragPoint => {
-        canvas.self.getGraphics.drawImage(screen, 0, 0, screen.getWidth, screen.getHeight, null)
-        canvas.self.getGraphics.drawRect(
-          pressPoint.x min dragPoint.x,
-          pressPoint.y min dragPoint.y,
-          math.abs(dragPoint.x - pressPoint.x),
-          math.abs(dragPoint.y - pressPoint.y)
-        )
-      }
-      case releasePoint: ReleasePoint => loop(react {
-        case UploadAction => uploadImage(Scalr.crop(screen, pressPoint.x min releasePoint.x,
-          pressPoint.y min releasePoint.y,
-          math.abs(releasePoint.x - pressPoint.x),
-          math.abs(releasePoint.y - pressPoint.y), null))
-
-        case SaveAction => saveImage(Scalr.crop(screen, pressPoint.x min releasePoint.x,
-          pressPoint.y min releasePoint.y,
-          math.abs(releasePoint.x - pressPoint.x),
-          math.abs(releasePoint.y - pressPoint.y), null))
-        case pressPoint: PressPoint => action(pressPoint)
-      })
-      case pressPoint: PressPoint => action(pressPoint)
-    })
-  }
 
   private def saveImage(image: BufferedImage) {
     if (chooser.showSaveDialog(null) == FileChooser.Result.Approve) {

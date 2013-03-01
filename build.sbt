@@ -8,11 +8,12 @@
 
   version := "0.1"
 
-  scalaVersion := "2.9.2"
+  scalaVersion := "2.10.0"
 
   libraryDependencies := Seq(
     "org.imgscalr" % "imgscalr-lib" % "4.2",
-    "org.scala-lang" % "scala-swing" % "2.9.2",
+    "com.typesafe.akka" %% "akka-actor" % "2.1.0",
+    "org.scala-lang" % "scala-swing" % "2.10.0",
     "commons-lang" % "commons-lang" % "2.6",
     "commons-codec" % "commons-codec" % "1.6",
     "commons-collections" % "commons-collections" % "3.2.1",
