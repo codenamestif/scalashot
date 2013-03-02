@@ -12,7 +12,7 @@
 
   libraryDependencies := Seq(
     "org.imgscalr" % "imgscalr-lib" % "4.2",
-    "com.typesafe.akka" %% "akka-actor" % "2.1.0",
+    "com.typesafe.akka" %% "akka-actor" % "2.1.1",
     "org.scala-lang" % "scala-swing" % "2.10.0",
     "commons-lang" % "commons-lang" % "2.6",
     "commons-codec" % "commons-codec" % "1.6",
